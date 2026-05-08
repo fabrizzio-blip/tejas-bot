@@ -21,6 +21,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 CREDENTIALS_FILE = "credentials.json"
 FOLDER_ID = "11_WUZ0BmlAugr5KiJpwNmx4QqnojgqM4"
 ADMIN_CHANNEL = "C0B2NTD8DT6"
+ADMIN_USER = "U0A9NJB217B"
 ADMIN_USERS = ["U0A9NJB217B", "U06BEBPV6CE", "U08LCQR3BBK"]
 CACHED_DOCS = ""
 
@@ -184,6 +185,78 @@ def send_with_feedback(say, answer, question, user, thread_ts=None):
         ]
     )
 
+@app.event("app_home_opened")
+def update_home_tab(event, client):
+    client.views_publish(
+        user_id=event["user"],
+        view={
+            "type": "home",
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": "👋 Welcome to Tejas Knowledge Bot!"}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "I'm your internal AI assistant. I can answer questions about company processes, policies, and procedures using only verified Tejas Equipment Rentals documents."}
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": "🔍 How to use me"}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "*In any channel:*\nMention me with your question:\n`@Tejas Knowledge Bot what is the hiring process?`"}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "*Follow-up questions:*\nReply in the same thread and I'll remember the conversation context."}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "*Rate my answers:*\nUse the ✅ Helpful or ⚠️ Incomplete/Wrong buttons after every answer to help improve the knowledge base."}
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": "💡 Example questions"}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "• What is the hiring process?\n• How do I process a payment waiver?\n• What are the steps for onboarding a new employee?\n• How do I generate a daily inventory report?\n• What is the process for posting ACH payments?\n• How do I process a refund?"}
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": "⚠️ Important notes"}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "• I only answer from *verified Tejas internal documents*\n• If I don't have the answer, I'll let you know and point you to the right department\n• Every answer includes a 📄 source link to the original Google Drive document"}
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": "🛠️ *Built for Tejas Equipment Rentals* | Questions about the bot? Contact <@U0A9NJB217B>"
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+
 @app.event("app_mention")
 def handle_mention(event, say, client):
     question = event["text"]
@@ -191,7 +264,32 @@ def handle_mention(event, say, client):
     channel = event["channel"]
     thread_ts = event.get("thread_ts") or event["ts"]
 
-    # Refresh command — only admin can use it
+    # Help command
+    if "help" in question.lower():
+        say(
+            thread_ts=thread_ts,
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "👋 *Hi! I'm the Tejas Equipment Rentals Knowledge Bot!*\nHere's what I can do:"}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "🔍 *Ask me anything* about company processes, SOPs, HR policies, billing, equipment, and more.\n\n💬 *Follow-up questions* — reply in the same thread and I'll remember the conversation.\n\n✅ *Rate my answers* — use the Helpful or Incomplete/Wrong buttons after every answer.\n\n📄 *Sources* — every answer includes a link to the original Google Drive document."}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "💡 *Example questions:*\n• What is the hiring process?\n• How do I process a payment waiver?\n• What are the steps for onboarding a new employee?\n• How do I generate a daily inventory report?"}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "⚠️ *Note:* I only answer from verified Tejas internal documents. If I don't have the answer, I'll let you know and point you to the right department."}
+                }
+            ]
+        )
+        return
+
+    # Refresh command — only admins can use it
     if "refresh" in question.lower():
         if user in ADMIN_USERS:
             say(text="🔄 Refreshing documents from Google Drive... this may take a minute.", thread_ts=thread_ts)
