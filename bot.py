@@ -341,6 +341,7 @@ def handle_message(event, say):
         return
 
     if event.get("channel_type") == "im":
+        say(text="Let me look that up for you... 🔍")
         answer = ask_claude(text, CACHED_DOCS)
         send_with_feedback(say, answer, text, user)
 
@@ -431,4 +432,3 @@ def start_bot():
 
 if __name__ == "__main__":
     start_bot()
-    

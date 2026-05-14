@@ -6,9 +6,10 @@ creds = service_account.Credentials.from_service_account_file("credentials.json"
 service = build("drive", "v3", credentials=creds)
 
 results = service.files().list(
-    q="'11_WUZ0BmlAugr5KiJpwNmx4QqnojgqM4' in parents",
-    fields="files(name, webViewLink)"
+    q="'1-MrLLnYFZWxymkmB9HJlNkr4V9A-tCSS' in parents",
+    fields="files(name, mimeType, webViewLink)"
 ).execute()
 
-for f in results.get("files", [])[:5]:
-    print(f["name"], "->", f.get("webViewLink", "NO LINK"))
+for f in results.get("files", []):
+    print(f["name"], "->", f["mimeType"])
+    
