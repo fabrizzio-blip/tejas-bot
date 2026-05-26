@@ -25,7 +25,7 @@ ADMIN_USER = "U0A9NJB217B"
 ADMIN_USERS = ["U0A9NJB217B", "U06BEBPV6CE", "U08LCQR3BBK"]
 CACHED_DOCS = ""
 
-SYSTEM_PROMPT = """You are the internal knowledge assistant for Tejas Equipment Rentals. 
+SYSTEM_PROMPT = """You are T.I.A. (Tejas Information Assistant), the internal knowledge assistant for Tejas Equipment Rentals. 
 You only answer questions using the company documents provided to you.
 If the answer is not in the documents, say: 'I don't have that information in our current knowledge base. Please contact the appropriate department directly.'
 Never use outside knowledge or make things up.
@@ -204,11 +204,11 @@ def update_home_tab(event, client):
             "blocks": [
                 {
                     "type": "header",
-                    "text": {"type": "plain_text", "text": "👋 Welcome to Tejas Knowledge Bot!"}
+                    "text": {"type": "plain_text", "text": "👋 Welcome to T.I.A. - Tejas Information Assistant!"}
                 },
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "I'm your internal AI assistant. I can answer questions about company processes, policies, and procedures using only verified Tejas Equipment Rentals documents."}
+                    "text": {"type": "mrkdwn", "text": "I'm *T.I.A.*, your internal AI assistant for Tejas Equipment Rentals. Ask me anything about company processes, policies, and procedures — I'll answer using only verified internal documents."}
                 },
                 {
                     "type": "divider"
@@ -219,7 +219,7 @@ def update_home_tab(event, client):
                 },
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "*In any channel:*\nMention me with your question:\n`@Tejas Knowledge Bot what is the hiring process?`"}
+                    "text": {"type": "mrkdwn", "text": "*In any channel:*\nMention me with your question:\n`@T.I.A. - Tejas Information Assistant what is the hiring process?`"}
                 },
                 {
                     "type": "section",
@@ -259,7 +259,7 @@ def update_home_tab(event, client):
                     "elements": [
                         {
                             "type": "mrkdwn",
-                            "text": "🛠️ *Built for Tejas Equipment Rentals* | Questions about the bot? Contact <@U0A9NJB217B>"
+                            "text": "🛠️ *T.I.A. - Tejas Information Assistant* | Questions about the bot? Contact <@U0A9NJB217B>"
                         }
                     ]
                 }
@@ -281,7 +281,7 @@ def handle_mention(event, say, client):
             blocks=[
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "👋 *Hi! I'm the Tejas Equipment Rentals Knowledge Bot!*\nHere's what I can do:"}
+                    "text": {"type": "mrkdwn", "text": "👋 *Hi! I'm T.I.A. — Tejas Information Assistant!*\nHere's what I can do:"}
                 },
                 {
                     "type": "section",
@@ -305,7 +305,7 @@ def handle_mention(event, say, client):
             say(text="🔄 Refreshing documents from Google Drive... this may take a minute.", thread_ts=thread_ts)
             global CACHED_DOCS
             CACHED_DOCS = load_documents_from_drive()
-            say(text="✅ Documents refreshed! The bot is now using the latest versions from Google Drive.", thread_ts=thread_ts)
+            say(text="✅ Documents refreshed! T.I.A. is now using the latest versions from Google Drive.", thread_ts=thread_ts)
         else:
             say(text="Sorry, only admins can refresh the documents. 🔒", thread_ts=thread_ts)
         return
@@ -427,19 +427,18 @@ def handle_feedback_submission(ack, body, client):
 
 print("Loading documents from Google Drive...")
 CACHED_DOCS = load_documents_from_drive()
-print("Documents loaded and cached! Bot is ready.")
+print("Documents loaded and cached! T.I.A. is ready.")
 
 def start_bot():
     while True:
         try:
-            print("Tejas Knowledge Bot is starting...")
+            print("T.I.A. - Tejas Information Assistant is starting...")
             handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
             handler.start()
         except Exception as e:
-            print(f"Bot crashed: {e}")
+            print(f"T.I.A. crashed: {e}")
             print("Restarting in 10 seconds...")
             time.sleep(10)
 
 if __name__ == "__main__":
     start_bot()
-    
