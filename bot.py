@@ -25,7 +25,7 @@ ADMIN_USER = "U0A9NJB217B"
 ADMIN_USERS = ["U0A9NJB217B", "U06BEBPV6CE", "U08LCQR3BBK"]
 CACHED_DOCS = ""
 
-SYSTEM_PROMPT = """You are T.I.A. (Tejas Information Assistant), the internal knowledge assistant for Tejas Equipment Rentals. 
+SYSTEM_PROMPT = """You are TIA (Tejas Information Assistant), the internal knowledge assistant for Tejas Equipment Rentals. 
 You only answer questions using the company documents provided to you.
 If the answer is not in the documents, say: 'I don't have that information in our current knowledge base. Please contact the appropriate department directly.'
 Never use outside knowledge or make things up.
@@ -204,11 +204,11 @@ def update_home_tab(event, client):
             "blocks": [
                 {
                     "type": "header",
-                    "text": {"type": "plain_text", "text": "👋 Welcome to T.I.A. - Tejas Information Assistant!"}
+                    "text": {"type": "plain_text", "text": "👋 Welcome to TIA - Tejas Information Assistant!"}
                 },
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "I'm *T.I.A.*, your internal AI assistant for Tejas Equipment Rentals. Ask me anything about company processes, policies, and procedures — I'll answer using only verified internal documents."}
+                    "text": {"type": "mrkdwn", "text": "I'm *TIA*, your internal AI assistant for Tejas Equipment Rentals. Ask me anything about company processes, policies, and procedures — I'll answer using only verified internal documents."}
                 },
                 {
                     "type": "divider"
@@ -219,7 +219,7 @@ def update_home_tab(event, client):
                 },
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "*In any channel:*\nMention me with your question:\n`@T.I.A. - Tejas Information Assistant what is the hiring process?`"}
+                    "text": {"type": "mrkdwn", "text": "*In any channel:*\nMention me with your question:\n`@TIA what is the hiring process?`"}
                 },
                 {
                     "type": "section",
@@ -249,7 +249,7 @@ def update_home_tab(event, client):
                 },
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "• I only answer from *verified Tejas internal documents*\n• If I don't have the answer, I'll let you know and point you to the right department\n• Every answer includes a 📄 source link to the original Google Drive document"}
+                    "text": {"type": "mrkdwn", "text": "• I only answer from *verified Tejas internal documents*\n• If I don't have the answer, I'll let you know and point you to the right department\n• Every answer includes a 📄 source link to the original Google Drive document\n• Your direct message conversations with me are *completely private* 🔒"}
                 },
                 {
                     "type": "divider"
@@ -259,7 +259,7 @@ def update_home_tab(event, client):
                     "elements": [
                         {
                             "type": "mrkdwn",
-                            "text": "🛠️ *T.I.A. - Tejas Information Assistant* | Questions about the bot? Contact <@U0A9NJB217B>"
+                            "text": "🛠️ *TIA - Tejas Information Assistant* | Questions about the bot? Contact <@U0A9NJB217B>"
                         }
                     ]
                 }
@@ -281,11 +281,11 @@ def handle_mention(event, say, client):
             blocks=[
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "👋 *Hi! I'm T.I.A. — Tejas Information Assistant!*\nHere's what I can do:"}
+                    "text": {"type": "mrkdwn", "text": "👋 *Hi! I'm TIA — Tejas Information Assistant!*\nHere's what I can do:"}
                 },
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "🔍 *Ask me anything* about company processes, SOPs, HR policies, billing, equipment, and more.\n\n💬 *Follow-up questions* — reply in the same thread and I'll remember the conversation.\n\n✅ *Rate my answers* — use the Helpful or Incomplete/Wrong buttons after every answer.\n\n📄 *Sources* — every answer includes a link to the original Google Drive document."}
+                    "text": {"type": "mrkdwn", "text": "🔍 *Ask me anything* about company processes, SOPs, HR policies, billing, equipment, and more.\n\n💬 *Follow-up questions* — reply in the same thread and I'll remember the conversation.\n\n✅ *Rate my answers* — use the Helpful or Incomplete/Wrong buttons after every answer.\n\n📄 *Sources* — every answer includes a link to the original Google Drive document.\n\n🔒 *Privacy* — your direct message conversations with me are completely private."}
                 },
                 {
                     "type": "section",
@@ -305,7 +305,7 @@ def handle_mention(event, say, client):
             say(text="🔄 Refreshing documents from Google Drive... this may take a minute.", thread_ts=thread_ts)
             global CACHED_DOCS
             CACHED_DOCS = load_documents_from_drive()
-            say(text="✅ Documents refreshed! T.I.A. is now using the latest versions from Google Drive.", thread_ts=thread_ts)
+            say(text="✅ Documents refreshed! TIA is now using the latest versions from Google Drive.", thread_ts=thread_ts)
         else:
             say(text="Sorry, only admins can refresh the documents. 🔒", thread_ts=thread_ts)
         return
@@ -427,16 +427,16 @@ def handle_feedback_submission(ack, body, client):
 
 print("Loading documents from Google Drive...")
 CACHED_DOCS = load_documents_from_drive()
-print("Documents loaded and cached! T.I.A. is ready.")
+print("Documents loaded and cached! TIA is ready.")
 
 def start_bot():
     while True:
         try:
-            print("T.I.A. - Tejas Information Assistant is starting...")
+            print("TIA - Tejas Information Assistant is starting...")
             handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
             handler.start()
         except Exception as e:
-            print(f"T.I.A. crashed: {e}")
+            print(f"TIA crashed: {e}")
             print("Restarting in 10 seconds...")
             time.sleep(10)
 
