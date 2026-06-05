@@ -1,16 +1,15 @@
 import os
 import time
+import json
+import datetime
 from dotenv import load_dotenv
 from anthropic import Anthropic
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
-import fitz
-from docx import Document
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
 from google.oauth2 import service_account
-import io
-import json
+from pinecone import Pinecone
+import voyageai
 
 load_dotenv()
 
@@ -23,7 +22,13 @@ FOLDER_ID = "11_WUZ0BmlAugr5KiJpwNmx4QqnojgqM4"
 ADMIN_CHANNEL = "C0B2NTD8DT6"
 ADMIN_USER = "U0A9NJB217B"
 ADMIN_USERS = ["U0A9NJB217B", "U06BEBPV6CE", "U08LCQR3BBK"]
-CACHED_DOCS = ""
+
+PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY", "pcsk_36APWc_MhxapzxeUveaZu1CCmSQgSaRsHgFNgy1d7777wkZgYs2PNWFgRULPmYniwWTtdy")
+VOYAGE_API_KEY = os.environ.get("VOYAGE_API_KEY", "pa-XfIYHO-YOtcroKMitig66-uAV4fUKmUPnrO69gYojMd")
+
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index("tia-docs")
+vo = voyageai.Client(api_key=VOYAGE_API_KEY)
 
 SYSTEM_PROMPT = """You are TIA (Tejas Information Assistant), the internal knowledge assistant for Tejas Equipment Rentals. 
 You only answer questions using the company documents provided to you.
@@ -53,72 +58,36 @@ def get_drive_service():
             CREDENTIALS_FILE, scopes=SCOPES)
     return build("drive", "v3", credentials=creds)
 
-def get_all_files(service, folder_id):
-    files = []
-    query = f"'{folder_id}' in parents and trashed=false"
-    results = service.files().list(
-        q=query,
-        fields="files(id, name, mimeType, webViewLink)"
-    ).execute()
-    items = results.get("files", [])
-    for item in items:
-        if item["mimeType"] == "application/vnd.google-apps.folder":
-            files.extend(get_all_files(service, item["id"]))
-        else:
-            files.append(item)
-    return files
-
-def read_drive_file(service, file):
-    mime = file["mimeType"]
-    file_id = file["id"]
+def search_relevant_docs(question, top_k=8):
     try:
-        if mime == "application/vnd.google-apps.document":
-            content = service.files().export(
-                fileId=file_id, mimeType="text/plain").execute()
-            return content.decode("utf-8", errors="ignore")
-        elif mime == "application/vnd.google-apps.presentation":
-            content = service.files().export(
-                fileId=file_id, mimeType="text/plain").execute()
-            return content.decode("utf-8", errors="ignore")
-        elif mime == "application/pdf":
-            request = service.files().get_media(fileId=file_id)
-            buffer = io.BytesIO()
-            downloader = MediaIoBaseDownload(buffer, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            buffer.seek(0)
-            doc = fitz.open(stream=buffer.read(), filetype="pdf")
-            return "\n".join([page.get_text() for page in doc])
-        elif mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            request = service.files().get_media(fileId=file_id)
-            buffer = io.BytesIO()
-            downloader = MediaIoBaseDownload(buffer, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            buffer.seek(0)
-            doc = Document(buffer)
-            return "\n".join([para.text for para in doc.paragraphs])
-        else:
-            return ""
-    except Exception as e:
-        return f"[Could not read {file['name']}: {e}]"
+        embedding = vo.embed(
+            [question],
+            model="voyage-3",
+            input_type="query"
+        ).embeddings[0]
 
-def load_documents_from_drive():
-    try:
-        service = get_drive_service()
-        files = get_all_files(service, FOLDER_ID)
+        results = index.query(
+            vector=embedding,
+            top_k=top_k,
+            include_metadata=True
+        )
+
         docs_text = ""
-        for file in files:
-            content = read_drive_file(service, file)
-            if content.strip():
-                link = file.get("webViewLink", "No link available")
-                docs_text += f"\n\n--- {file['name']} (Link: {link}) ---\n"
-                docs_text += content
-        return docs_text if docs_text else "No documents found in Drive."
+        seen_files = set()
+        for match in results.matches:
+            metadata = match.metadata
+            file_name = metadata.get("file_name", "Unknown")
+            web_link = metadata.get("web_view_link", "")
+            text = metadata.get("text", "")
+
+            if file_name not in seen_files:
+                seen_files.add(file_name)
+                docs_text += f"\n\n--- {file_name} (Link: {web_link}) ---\n"
+            docs_text += text + "\n"
+
+        return docs_text if docs_text else "No relevant documents found."
     except Exception as e:
-        return f"Error loading documents: {e}"
+        return f"Error searching documents: {e}"
 
 def ask_claude(question, docs):
     message = client.messages.create(
@@ -127,7 +96,7 @@ def ask_claude(question, docs):
         messages=[
             {
                 "role": "user",
-                "content": f"Company documents:\n{docs[:150000]}\n\nEmployee question: {question}"
+                "content": f"Company documents:\n{docs}\n\nEmployee question: {question}"
             }
         ],
         system=SYSTEM_PROMPT
@@ -140,7 +109,7 @@ def ask_claude_with_history(conversation, docs):
         if i == 0 and msg["role"] == "user":
             messages.append({
                 "role": "user",
-                "content": f"Company documents:\n{docs[:150000]}\n\nEmployee question: {msg['content']}"
+                "content": f"Company documents:\n{docs}\n\nEmployee question: {msg['content']}"
             })
         else:
             messages.append(msg)
@@ -301,10 +270,13 @@ def handle_mention(event, say, client):
     # Refresh command — only admins can use it
     if "refresh" in question.lower():
         if user in ADMIN_USERS:
-            say(text="🔄 Refreshing documents from Google Drive... this may take a minute.", thread_ts=thread_ts)
-            global CACHED_DOCS
-            CACHED_DOCS = load_documents_from_drive()
-            say(text="✅ Documents refreshed! TIA is now using the latest versions from Google Drive.", thread_ts=thread_ts)
+            say(text="🔄 Re-indexing documents from Google Drive... this may take a few minutes.", thread_ts=thread_ts)
+            try:
+                import subprocess
+                subprocess.Popen(["python", "index_docs.py"])
+                say(text="✅ Re-indexing started! TIA will have the latest documents in a few minutes.", thread_ts=thread_ts)
+            except Exception as e:
+                say(text=f"⚠️ Could not start re-indexing: {e}", thread_ts=thread_ts)
         else:
             say(text="Sorry, only admins can refresh the documents. 🔒", thread_ts=thread_ts)
         return
@@ -313,6 +285,9 @@ def handle_mention(event, say, client):
         text=f"<@{user}> Let me look that up for you... 🔍",
         thread_ts=thread_ts
     )
+
+    # Use RAG to find relevant docs
+    docs = search_relevant_docs(question)
 
     conversation = []
     if event.get("thread_ts"):
@@ -337,7 +312,7 @@ def handle_mention(event, say, client):
             "content": question
         })
 
-    answer = ask_claude_with_history(conversation, CACHED_DOCS)
+    answer = ask_claude_with_history(conversation, docs)
     send_with_feedback(say, answer, question, user, thread_ts)
 
 @app.event("message")
@@ -351,7 +326,8 @@ def handle_message(event, say):
 
     if event.get("channel_type") == "im":
         say(text="Let me look that up for you... 🔍")
-        answer = ask_claude(text, CACHED_DOCS)
+        docs = search_relevant_docs(text)
+        answer = ask_claude(text, docs)
         send_with_feedback(say, answer, text, user)
 
 @app.action("feedback_helpful")
@@ -424,9 +400,9 @@ def handle_feedback_submission(ack, body, client):
         text=f"<@{user}> Thanks for the feedback! The admin team has been notified and will update the documents. 🙏"
     )
 
-print("Loading documents from Google Drive...")
-CACHED_DOCS = load_documents_from_drive()
-print("Documents loaded and cached! TIA is ready.")
+print("TIA is starting with RAG enabled...")
+print("Connecting to Pinecone...")
+print("Ready! TIA is now using smart document search.")
 
 def start_bot():
     while True:
