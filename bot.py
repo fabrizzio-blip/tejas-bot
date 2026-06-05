@@ -43,10 +43,9 @@ Format all responses for Slack using these rules:
 At the end of every answer, add a new line that says '📄 *Source:*' followed by the file name(s) you used, and format each Google Drive link like this so it's clickable in Slack: <https://drive.google.com/...|File Name>"""
 
 def get_drive_service():
-    import json as json_module
     creds_json = os.environ.get("GOOGLE_CREDENTIALS")
     if creds_json:
-        creds_info = json_module.loads(creds_json)
+        creds_info = json.loads(creds_json)
         creds = service_account.Credentials.from_service_account_info(
             creds_info, scopes=SCOPES)
     else:
@@ -442,3 +441,4 @@ def start_bot():
 
 if __name__ == "__main__":
     start_bot()
+    
