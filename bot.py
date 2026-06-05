@@ -35,6 +35,8 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("tia-docs")
 vo = voyageai.Client(api_key=VOYAGE_API_KEY)
 
+STATS_FILE = "stats.json"
+
 SYSTEM_PROMPT = """You are TIA (Tejas Information Assistant), the internal knowledge assistant for Tejas Equipment Rentals. 
 You only answer questions using the company documents provided to you.
 If the answer is not in the documents, say: 'I don't have that information in our current knowledge base. Please contact the appropriate department directly.'
@@ -113,6 +115,97 @@ def read_file(service, file):
     except Exception:
         return ""
 
+def load_stats():
+    if os.path.exists(STATS_FILE):
+        with open(STATS_FILE, "r") as f:
+            return json.load(f)
+    return {
+        "total_questions": 0,
+        "helpful_count": 0,
+        "wrong_count": 0,
+        "questions_log": [],
+        "users": {},
+        "channels": {},
+        "documents_used": {}
+    }
+
+def save_stats(stats):
+    with open(STATS_FILE, "w") as f:
+        json.dump(stats, f, indent=2)
+
+def log_question(user, channel):
+    stats = load_stats()
+    stats["total_questions"] += 1
+    stats["users"][user] = stats["users"].get(user, 0) + 1
+    stats["channels"][channel] = stats["channels"].get(channel, 0) + 1
+    stats["questions_log"].append({
+        "timestamp": datetime.datetime.now().isoformat()
+    })
+    save_stats(stats)
+
+def log_document_used(doc_name):
+    stats = load_stats()
+    if "documents_used" not in stats:
+        stats["documents_used"] = {}
+    stats["documents_used"][doc_name] = stats["documents_used"].get(doc_name, 0) + 1
+    save_stats(stats)
+
+def log_helpful():
+    stats = load_stats()
+    stats["helpful_count"] += 1
+    save_stats(stats)
+
+def log_wrong():
+    stats = load_stats()
+    stats["wrong_count"] += 1
+    save_stats(stats)
+
+def get_stats_report():
+    stats = load_stats()
+    total = stats["total_questions"]
+    helpful = stats["helpful_count"]
+    wrong = stats["wrong_count"]
+    rated = helpful + wrong
+    helpfulness = round((helpful / rated) * 100) if rated > 0 else 0
+    top_users = sorted(stats["users"].items(), key=lambda x: x[1], reverse=True)[:5]
+    top_channels = sorted(stats["channels"].items(), key=lambda x: x[1], reverse=True)[:5]
+    recent = stats["questions_log"]
+
+    report = "*📊 TIA Analytics Report*\n\n"
+    report += "*Overall Usage:*\n"
+    report += f"• Total questions asked: *{total}*\n"
+    report += f"• Helpful ratings: *{helpful}* ✅\n"
+    report += f"• Incomplete/Wrong ratings: *{wrong}* ⚠️\n"
+    report += f"• Helpfulness rate: *{helpfulness}%*\n\n"
+
+    report += "*Top 5 Most Active Users:*\n"
+    if top_users:
+        for user_id, count in top_users:
+            report += f"• <@{user_id}>: {count} questions\n"
+    else:
+        report += "• No data yet\n"
+
+    report += "\n*Top 5 Most Active Channels:*\n"
+    if top_channels:
+        for channel_id, count in top_channels:
+            report += f"• <#{channel_id}>: {count} questions\n"
+    else:
+        report += "• No data yet\n"
+
+    report += "\n*Recent Activity:*\n"
+    report += f"• Last question received: _{recent[-1]['timestamp'][:10] if recent else 'N/A'}_\n"
+
+    report += "\n*📄 Top 5 Most Referenced Documents:*\n"
+    docs_used = stats.get("documents_used", {})
+    if docs_used:
+        top_docs = sorted(docs_used.items(), key=lambda x: x[1], reverse=True)[:5]
+        for doc_name, count in top_docs:
+            report += f"• {doc_name}: *{count}* times\n"
+    else:
+        report += "• No data yet\n"
+
+    return report
+
 def search_relevant_docs(question, top_k=8):
     try:
         embedding = vo.embed(
@@ -138,6 +231,7 @@ def search_relevant_docs(question, top_k=8):
             if file_name not in seen_files:
                 seen_files.add(file_name)
                 docs_text += f"\n\n--- {file_name} (Link: {web_link}) ---\n"
+                log_document_used(file_name)
             docs_text += text + "\n"
 
         return docs_text if docs_text else "No relevant documents found."
@@ -297,6 +391,15 @@ def handle_mention(event, say, client):
     channel = event["channel"]
     thread_ts = event.get("thread_ts") or event["ts"]
 
+    # Stats command — only admins
+    if "admin stats" in question.lower():
+        if user in ADMIN_USERS:
+            report = get_stats_report()
+            say(text=report, thread_ts=thread_ts)
+        else:
+            say(text="Sorry, only admins can view stats. 🔒", thread_ts=thread_ts)
+        return
+
     # Help command
     if "help" in question.lower():
         say(
@@ -322,7 +425,7 @@ def handle_mention(event, say, client):
         )
         return
 
-    # Refresh command — only admins can use it
+    # Refresh command — only admins
     if "refresh" in question.lower():
         if user in ADMIN_USERS:
             say(text="🔄 Re-indexing documents from Google Drive... this will take a few minutes. I'll let you know when done.", thread_ts=thread_ts)
@@ -380,6 +483,9 @@ def handle_mention(event, say, client):
             say(text="Sorry, only admins can refresh the documents. 🔒", thread_ts=thread_ts)
         return
 
+    # Log the question
+    log_question(user, channel)
+
     say(
         text=f"<@{user}> Let me look that up for you... 🔍",
         thread_ts=thread_ts
@@ -423,6 +529,7 @@ def handle_message(event, say):
         return
 
     if event.get("channel_type") == "im":
+        log_question(user, "dm")
         say(text="Let me look that up for you... 🔍")
         docs = search_relevant_docs(text)
         answer = ask_claude(text, docs)
@@ -433,6 +540,7 @@ def handle_helpful(ack, body, client):
     ack()
     data = json.loads(body["actions"][0]["value"])
     user = data["user"]
+    log_helpful()
     client.chat_postMessage(
         channel=ADMIN_CHANNEL,
         text=f"✅ *Positive feedback received!*\n*User:* <@{user}>\n*Question:* {data['question']}"
@@ -447,6 +555,7 @@ def handle_helpful(ack, body, client):
 def handle_wrong(ack, body, client):
     ack()
     data = json.loads(body["actions"][0]["value"])
+    log_wrong()
 
     client.views_open(
         trigger_id=body["trigger_id"],
