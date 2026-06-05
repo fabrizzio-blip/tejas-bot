@@ -1,15 +1,20 @@
 import os
 import time
 import json
+import threading
 import datetime
 from dotenv import load_dotenv
 from anthropic import Anthropic
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 from google.oauth2 import service_account
 from pinecone import Pinecone
 import voyageai
+import fitz
+from docx import Document
+import io
 
 load_dotenv()
 
@@ -57,6 +62,56 @@ def get_drive_service():
         creds = service_account.Credentials.from_service_account_file(
             CREDENTIALS_FILE, scopes=SCOPES)
     return build("drive", "v3", credentials=creds)
+
+def get_all_drive_files(service, folder_id):
+    files = []
+    query = f"'{folder_id}' in parents and trashed=false"
+    results = service.files().list(
+        q=query,
+        fields="files(id, name, mimeType, webViewLink)"
+    ).execute()
+    items = results.get("files", [])
+    for item in items:
+        if item["mimeType"] == "application/vnd.google-apps.folder":
+            files.extend(get_all_drive_files(service, item["id"]))
+        else:
+            files.append(item)
+    return files
+
+def read_file(service, file):
+    mime = file["mimeType"]
+    file_id = file["id"]
+    try:
+        if mime == "application/vnd.google-apps.document":
+            content = service.files().export(fileId=file_id, mimeType="text/plain").execute()
+            return content.decode("utf-8", errors="ignore")
+        elif mime == "application/vnd.google-apps.presentation":
+            content = service.files().export(fileId=file_id, mimeType="text/plain").execute()
+            return content.decode("utf-8", errors="ignore")
+        elif mime == "application/pdf":
+            request = service.files().get_media(fileId=file_id)
+            buffer = io.BytesIO()
+            downloader = MediaIoBaseDownload(buffer, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            buffer.seek(0)
+            doc = fitz.open(stream=buffer.read(), filetype="pdf")
+            return "\n".join([page.get_text() for page in doc])
+        elif mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            request = service.files().get_media(fileId=file_id)
+            buffer = io.BytesIO()
+            downloader = MediaIoBaseDownload(buffer, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            buffer.seek(0)
+            doc = Document(buffer)
+            return "\n".join([para.text for para in doc.paragraphs])
+        else:
+            return ""
+    except Exception:
+        return ""
 
 def search_relevant_docs(question, top_k=8):
     try:
@@ -270,11 +325,55 @@ def handle_mention(event, say, client):
     # Refresh command — only admins can use it
     if "refresh" in question.lower():
         if user in ADMIN_USERS:
-            say(text="🔄 Re-indexing documents from Google Drive... this may take a few minutes.", thread_ts=thread_ts)
+            say(text="🔄 Re-indexing documents from Google Drive... this will take a few minutes. I'll let you know when done.", thread_ts=thread_ts)
             try:
-                import subprocess
-                subprocess.Popen(["python", "index_docs.py"])
-                say(text="✅ Re-indexing started! TIA will have the latest documents in a few minutes.", thread_ts=thread_ts)
+                def reindex():
+                    try:
+                        drive_service = get_drive_service()
+                        all_files = get_all_drive_files(drive_service, FOLDER_ID)
+                        index.delete(delete_all=True)
+                        time.sleep(2)
+                        vectors = []
+                        for file in all_files:
+                            content = read_file(drive_service, file)
+                            if not content.strip():
+                                continue
+                            chunks = [content[j:j+1000] for j in range(0, len(content), 800)]
+                            for k, chunk in enumerate(chunks):
+                                if not chunk.strip():
+                                    continue
+                                try:
+                                    embedding = vo.embed([chunk], model="voyage-3", input_type="document").embeddings[0]
+                                    vectors.append({
+                                        "id": f"{file['id']}_{k}",
+                                        "values": embedding,
+                                        "metadata": {
+                                            "file_name": file["name"],
+                                            "file_id": file["id"],
+                                            "web_view_link": file.get("webViewLink", ""),
+                                            "text": chunk[:500]
+                                        }
+                                    })
+                                    if len(vectors) >= 50:
+                                        index.upsert(vectors=vectors)
+                                        vectors = []
+                                        time.sleep(0.5)
+                                except Exception:
+                                    continue
+                        if vectors:
+                            index.upsert(vectors=vectors)
+                        app.client.chat_postMessage(
+                            channel=channel,
+                            thread_ts=thread_ts,
+                            text="✅ Re-indexing complete! TIA now has the latest documents from Google Drive."
+                        )
+                    except Exception as e:
+                        app.client.chat_postMessage(
+                            channel=channel,
+                            thread_ts=thread_ts,
+                            text=f"⚠️ Re-indexing failed: {e}"
+                        )
+                threading.Thread(target=reindex, daemon=True).start()
             except Exception as e:
                 say(text=f"⚠️ Could not start re-indexing: {e}", thread_ts=thread_ts)
         else:
@@ -286,7 +385,6 @@ def handle_mention(event, say, client):
         thread_ts=thread_ts
     )
 
-    # Use RAG to find relevant docs
     docs = search_relevant_docs(question)
 
     conversation = []
