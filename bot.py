@@ -127,7 +127,7 @@ def ask_claude(question, docs):
         messages=[
             {
                 "role": "user",
-                "content": f"Company documents:\n{docs}\n\nEmployee question: {question}"
+                "content": f"Company documents:\n{docs[:150000]}\n\nEmployee question: {question}"
             }
         ],
         system=SYSTEM_PROMPT
@@ -140,7 +140,7 @@ def ask_claude_with_history(conversation, docs):
         if i == 0 and msg["role"] == "user":
             messages.append({
                 "role": "user",
-                "content": f"Company documents:\n{docs}\n\nEmployee question: {msg['content']}"
+                "content": f"Company documents:\n{docs[:150000]}\n\nEmployee question: {msg['content']}"
             })
         else:
             messages.append(msg)
