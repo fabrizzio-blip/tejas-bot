@@ -5,3 +5,5 @@ pymupdf
 python-docx
 google-api-python-client
 google-auth
+pinecone
+voyageai
