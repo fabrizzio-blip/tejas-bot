@@ -116,9 +116,12 @@ def read_file(service, file):
         return ""
 
 def load_stats():
-    if os.path.exists(STATS_FILE):
-        with open(STATS_FILE, "r") as f:
-            return json.load(f)
+    try:
+        if os.path.exists(STATS_FILE):
+            with open(STATS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
     return {
         "total_questions": 0,
         "helpful_count": 0,
@@ -624,4 +627,3 @@ def start_bot():
 
 if __name__ == "__main__":
     start_bot()
-    
