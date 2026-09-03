@@ -88,8 +88,6 @@ The first attempt to index all 206 documents into Pinecone failed silently only 
 
 ---
 
----
-
 ## Limitations
 
 - TIA can only answer questions about documented processes if a process isn't in Google Drive, TIA either says it doesn't know or, worse, gives a partial answer from a loosely related document
