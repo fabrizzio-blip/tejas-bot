@@ -84,7 +84,7 @@ The first attempt to index all 206 documents into Pinecone failed silently only 
 - The majority of questions (20 of 31 in the post-reset period) came through private DMs, not public channels privacy matters more than expected
 - A single re-engagement Slack message drove a 60% spike in weekly usage adoption is a communication problem as much as a technology problem
 - The most referenced documents were operational SOPs (inventory counts, PTO requests, onboarding) the tool is being used for exactly the repetitive questions it was built to answer
-- Total infrastructure cost is ~$30/month: Railway ($5), Anthropic API (~$20), Voyage AI (~$2), Pinecone ($0 on free tier)
+- Total infrastructure cost is approximately $30/month: Railway ($5), Anthropic API ($20), Voyage AI ($2), Pinecone ($0 on free tier)
 
 ---
 
