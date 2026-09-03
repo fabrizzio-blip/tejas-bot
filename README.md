@@ -123,13 +123,12 @@ Any small or mid-sized company fielding repetitive internal questions HR policie
 
 ```
 tejas-bot/
-├── bot.py              # Main bot  handles all Slack events, RAG search, Claude API calls, stats
-├── index_docs.py       # One-time (or on-demand) script to index Google Drive docs into Pinecone
+├── bot.py              # Main bot
+├── index_docs.py       # Indexing script
 ├── requirements.txt    # All Python dependencies
-├── .env.example        # Template for required environment variables (never commit the real .env)
-└── credentials.json    # Google service account key  local only, never committed to GitHub
-
----
+├── .env.example        # Template for environment variables
+└── credentials.json    # Google service account key — local only
+```
 
 ## Tools
 
