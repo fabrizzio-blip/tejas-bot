@@ -88,10 +88,6 @@ The first attempt to index all 206 documents into Pinecone failed silently only 
 
 ---
 
-## Recommendation / So What
-
-Any small or mid-sized company fielding repetitive internal questions HR policies, operational procedures, onboarding steps can deploy a system like this for under $50/month using off-the-shelf APIs and no custom model training. The technology is not the bottleneck; getting employees to change their default behavior (ask a coworker vs. ask TIA) is. Tejas Equipment Rentals should invest in making TIA the default first step for process questions through onboarding training, channel reminders, and manager encouragement before adding more features. The knowledge base is solid. The habit isn't formed yet.
-
 ---
 
 ## Limitations
